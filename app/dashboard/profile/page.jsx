@@ -6,6 +6,8 @@ import { SaveConfirmationModal } from "@/components/save-confirmation-modal"
 import { useAuth } from "@/contexts/auth-context"
 import { getUserProfile, updateUserProfile, uploadProfilePhoto } from "@/lib/firebase-utils"
 import ProfileImage from "@/components/profile-image"
+import { doc, onSnapshot } from "firebase/firestore"
+import { db, auth } from "@/lib/firebase"
 
 export default function ProfilePage() {
   const { user } = useAuth()
@@ -31,40 +33,76 @@ export default function ProfilePage() {
     photoURL: "",
   })
 
-  // Fetch user profile data
+  // Fetch user profile data with real-time listener for offline caching
   useEffect(() => {
-    async function fetchUserProfile() {
-      if (!user) return
+    if (!user) return
 
-      try {
-        setLoading(true)
-        const userData = await getUserProfile(user.uid)
-        if (userData) {
-          setProfile({
-            displayName: userData.displayName || user.displayName || "",
-            email: userData.email || user.email || "",
-            phone: userData.phone || "",
-            dob: userData.dob || "",
-            gender: userData.gender || "",
-            address: userData.address || "",
-            emergencyContact: userData.emergencyContact || "",
-            emergencyPhone: userData.emergencyPhone || "",
-            bloodType: userData.bloodType || "",
-            allergies: userData.allergies || "",
-            medicalConditions: userData.medicalConditions || "",
-            currentMedications: userData.currentMedications || "",
-            photoURL: userData.photoURL || user.photoURL || "",
-          })
+    setLoading(true)
+    
+    // Use onSnapshot for real-time updates and offline caching
+    const unsubscribe = onSnapshot(
+      doc(db, "users", user.uid),
+      (docSnap) => {
+        try {
+          if (docSnap.exists()) {
+            const userData = docSnap.data()
+            
+            // If there's no photoURL in Firestore but the user is authenticated,
+            // try to get it from the auth object
+            let photoURL = userData.photoURL
+            if (!photoURL && auth.currentUser && auth.currentUser.uid === user.uid) {
+              photoURL = auth.currentUser.photoURL
+            }
+            
+            setProfile({
+              displayName: userData.displayName || user.displayName || "",
+              email: userData.email || user.email || "",
+              phone: userData.phone || "",
+              dob: userData.dob || "",
+              gender: userData.gender || "",
+              address: userData.address || "",
+              emergencyContact: userData.emergencyContact || "",
+              emergencyPhone: userData.emergencyPhone || "",
+              bloodType: userData.bloodType || "",
+              allergies: userData.allergies || "",
+              medicalConditions: userData.medicalConditions || "",
+              currentMedications: userData.currentMedications || "",
+              photoURL: photoURL || user.photoURL || "",
+            })
+            setError(null)
+          } else {
+            // Document doesn't exist, use auth data
+            setProfile({
+              displayName: user.displayName || "",
+              email: user.email || "",
+              phone: "",
+              dob: "",
+              gender: "",
+              address: "",
+              emergencyContact: "",
+              emergencyPhone: "",
+              bloodType: "",
+              allergies: "",
+              medicalConditions: "",
+              currentMedications: "",
+              photoURL: user.photoURL || "",
+            })
+          }
+        } catch (err) {
+          console.error("Error processing profile data:", err)
+          setError("Failed to load profile data")
+        } finally {
+          setLoading(false)
         }
-      } catch (err) {
+      },
+      (err) => {
         console.error("Error fetching profile:", err)
         setError("Failed to load profile data")
-      } finally {
         setLoading(false)
       }
-    }
+    )
 
-    fetchUserProfile()
+    return () => unsubscribe()
   }, [user])
 
   const handleChange = (e) => {

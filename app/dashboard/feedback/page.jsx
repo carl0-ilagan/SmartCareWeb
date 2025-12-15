@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { addFeedback, getUserFeedback, deleteFeedback, getAllDoctors } from "@/lib/feedback-utils"
 import { SuccessNotification } from "@/components/success-notification"
 import { X, Check, Loader2 } from "lucide-react"
-import { getDoc, doc, addDoc, collection, serverTimestamp, getDocs, query, orderBy, updateDoc, deleteDoc } from "firebase/firestore"
+import { getDoc, doc, addDoc, collection, serverTimestamp, getDocs, query, orderBy, updateDoc, deleteDoc, onSnapshot, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import ProfileImage from "@/components/profile-image"
 import { DashboardHeaderBanner } from "@/components/dashboard-header-banner"
@@ -36,40 +36,52 @@ export default function PatientFeedbackPage() {
   const [editingText, setEditingText] = useState("")
   const [deletingTestimonialId, setDeletingTestimonialId] = useState(null)
 
-  // Load published testimonials (separate from feedback)
+  // Load published testimonials with real-time listener for offline caching
   useEffect(() => {
-    const loadTestimonials = async () => {
-      try {
-        const testimonialsRef = collection(db, "testimonials")
-        const q = query(testimonialsRef, orderBy("createdAt", "desc"))
-        const snapshot = await getDocs(q)
-        const items = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+    const testimonialsRef = collection(db, "testimonials")
+    const q = query(testimonialsRef, orderBy("createdAt", "desc"))
+    
+    // Use onSnapshot for real-time updates and offline caching
+    const unsubscribe = onSnapshot(
+      q,
+      async (snapshot) => {
+        try {
+          const items = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
 
-        // Enrich testimonials with global user context (role + specialty if doctor)
-        const enriched = await Promise.all(
-          items.map(async (item) => {
-            try {
-              if (!item.userId) return { ...item }
-              const userDoc = await getDoc(doc(db, "users", item.userId))
-              if (!userDoc.exists()) return { ...item }
+          // Enrich testimonials with global user context (role + specialty if doctor)
+          const enriched = await Promise.all(
+            items.map(async (item) => {
+              try {
+                if (!item.userId) return { ...item }
+                const userDoc = await getDoc(doc(db, "users", item.userId))
+                if (!userDoc.exists()) return { ...item }
 
-              const userData = userDoc.data() || {}
-              return {
-                ...item,
-                userRole: userData.role || item.userRole || "patient",
-                specialty: userData.specialty || userData.specialization || userData.speciality || null,
-                userName: item.userName || userData.displayName || userData.name || "User",
-                userProfile: item.userProfile || userData.photoURL || null,
+                const userData = userDoc.data() || {}
+                return {
+                  ...item,
+                  userRole: userData.role || item.userRole || "patient",
+                  specialty: userData.specialty || userData.specialization || userData.speciality || null,
+                  userName: item.userName || userData.displayName || userData.name || "User",
+                  userProfile: item.userProfile || userData.photoURL || null,
+                }
+              } catch (err) {
+                console.warn("Failed to enrich testimonial user data", err)
+                return { ...item }
               }
-            } catch (err) {
-              console.warn("Failed to enrich testimonial user data", err)
-              return { ...item }
-            }
-          })
-        )
+            })
+          )
 
-        setTestimonials(enriched)
-      } catch (error) {
+          setTestimonials(enriched)
+        } catch (error) {
+          if (error?.code === "permission-denied") {
+            console.warn("Testimonials load blocked by permissions; showing none.")
+          } else {
+            console.error("Error loading testimonials:", error)
+          }
+          setTestimonials([])
+        }
+      },
+      (error) => {
         if (error?.code === "permission-denied") {
           console.warn("Testimonials load blocked by permissions; showing none.")
         } else {
@@ -77,66 +89,80 @@ export default function PatientFeedbackPage() {
         }
         setTestimonials([])
       }
-    }
+    )
 
-    loadTestimonials()
+    return () => unsubscribe()
   }, [])
 
-  // Load user feedback
+  // Load user feedback with real-time listener for offline caching
   useEffect(() => {
     if (!user) return
 
-    const loadFeedback = async () => {
-      try {
-        setLoading(true)
-        const feedback = await getUserFeedback(user.uid)
-        setPastFeedback(feedback)
+    setLoading(true)
+    
+    const feedbackRef = collection(db, "feedback")
+    const q = query(feedbackRef, where("userId", "==", user.uid), orderBy("createdAt", "desc"))
+    
+    // Use onSnapshot for real-time updates and offline caching
+    const unsubscribe = onSnapshot(
+      q,
+      async (snapshot) => {
+        try {
+          const feedback = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+            date: docSnap.data().createdAt?.toDate().toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
+          }))
+          
+          setPastFeedback(feedback)
 
-        // Update the admin profile fetching logic in the useEffect
+          // Fetch admin profiles for responses
+          const adminIds = feedback
+            .filter((item) => item.status === "responded" && item.respondedBy)
+            .map((item) => item.respondedBy)
+            .filter((value, index, self) => self.indexOf(value) === index) // Get unique admin IDs
 
-        // Replace the existing admin profile fetching code with this improved version:
-        // Fetch admin profiles for responses
-        const adminIds = feedback
-          .filter((item) => item.status === "responded" && item.respondedBy)
-          .map((item) => item.respondedBy)
-          .filter((value, index, self) => self.indexOf(value) === index) // Get unique admin IDs
+          const adminProfilesData = {}
+          for (const adminId of adminIds) {
+            try {
+              // First try to get from admins collection
+              const adminDoc = await getDoc(doc(db, "admins", adminId))
 
-        const adminProfilesData = {}
-        for (const adminId of adminIds) {
-          try {
-            // First try to get from admins collection
-            const adminDoc = await getDoc(doc(db, "admins", adminId))
-
-            if (adminDoc.exists()) {
-              console.log(`Admin profile found for ${adminId}:`, adminDoc.data())
-              adminProfilesData[adminId] = adminDoc.data()
-            } else {
-              // If not found in admins collection, try users collection with admin role
-              console.log(`Admin not found in admins collection, trying users collection for ${adminId}`)
-              const userDoc = await getDoc(doc(db, "users", adminId))
-
-              if (userDoc.exists() && userDoc.data().role === "admin") {
-                console.log(`Admin found in users collection for ${adminId}:`, userDoc.data())
-                adminProfilesData[adminId] = userDoc.data()
+              if (adminDoc.exists()) {
+                console.log(`Admin profile found for ${adminId}:`, adminDoc.data())
+                adminProfilesData[adminId] = adminDoc.data()
               } else {
-                console.log(`No admin profile found for ${adminId} in either collection`)
-              }
-            }
-          } catch (error) {
-            console.error(`Error fetching admin ${adminId}:`, error)
-          }
-        }
+                // If not found in admins collection, try users collection with admin role
+                console.log(`Admin not found in admins collection, trying users collection for ${adminId}`)
+                const userDoc = await getDoc(doc(db, "users", adminId))
 
-        console.log("Fetched admin profiles:", adminProfilesData)
-        setAdminProfiles(adminProfilesData)
-      } catch (error) {
+                if (userDoc.exists() && userDoc.data().role === "admin") {
+                  console.log(`Admin found in users collection for ${adminId}:`, userDoc.data())
+                  adminProfilesData[adminId] = userDoc.data()
+                } else {
+                  console.log(`No admin profile found for ${adminId} in either collection`)
+                }
+              }
+            } catch (error) {
+              console.error(`Error fetching admin ${adminId}:`, error)
+            }
+          }
+
+          console.log("Fetched admin profiles:", adminProfilesData)
+          setAdminProfiles(adminProfilesData)
+        } catch (error) {
+          console.error("Error processing feedback:", error)
+        } finally {
+          setLoading(false)
+        }
+      },
+      (error) => {
         console.error("Error loading feedback:", error)
-      } finally {
         setLoading(false)
       }
-    }
+    )
 
-    loadFeedback()
+    return () => unsubscribe()
   }, [user])
 
   // Load doctors for dropdown

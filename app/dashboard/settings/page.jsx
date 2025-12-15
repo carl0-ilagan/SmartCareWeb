@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Lock, Shield, Calendar, Clock, Monitor, Smartphone, Globe, LogOut, RefreshCw, Smartphone as DeviceIcon, CheckSquare, Square } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { SuccessNotification } from "@/components/success-notification"
 import { SettingsBanner } from "@/components/settings-banner"
@@ -45,54 +45,72 @@ export default function SettingsPage() {
   const [trustedSessionIds, setTrustedSessionIds] = useState(new Set())
   const pageSize = 5
 
-  // Fetch user settings from Firestore
+  // Fetch user settings from Firestore with real-time listener for offline caching
   useEffect(() => {
-    const fetchSettings = async () => {
-      if (!user) return
+    if (!user) return
 
-      try {
-        setLoading(true)
-        const settingsDoc = await getDoc(doc(db, "userSettings", user.uid))
-        if (settingsDoc.exists()) {
-          // Merge with default settings to ensure all properties exist
-          const fetchedSettings = settingsDoc.data()
-          setSettings((prevSettings) => ({
-            notifications: { ...prevSettings.notifications, ...(fetchedSettings.notifications || {}) },
-            security: { 
-              twoFactor: fetchedSettings.security?.twoFactor ?? false, // Default to false if not set
-              sessionTimeout: fetchedSettings.security?.sessionTimeout ?? "30",
-            },
-          }))
-        } else {
-          // Create default settings if none exist (2FA off by default)
-          const defaultSettings = {
-            notifications: settings.notifications,
-            security: {
-              twoFactor: false, // Explicitly set to false
-              sessionTimeout: "30",
-            },
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
+    setLoading(true)
+    
+    // Use onSnapshot for real-time updates and offline caching
+    const unsubscribe = onSnapshot(
+      doc(db, "userSettings", user.uid),
+      async (settingsDoc) => {
+        try {
+          if (settingsDoc.exists()) {
+            // Merge with default settings to ensure all properties exist
+            const fetchedSettings = settingsDoc.data()
+            setSettings((prevSettings) => ({
+              notifications: { ...prevSettings.notifications, ...(fetchedSettings.notifications || {}) },
+              security: { 
+                twoFactor: fetchedSettings.security?.twoFactor ?? false, // Default to false if not set
+                sessionTimeout: fetchedSettings.security?.sessionTimeout ?? "30",
+              },
+            }))
+          } else {
+            // Create default settings if none exist (2FA off by default)
+            const defaultSettings = {
+              notifications: settings.notifications,
+              security: {
+                twoFactor: false, // Explicitly set to false
+                sessionTimeout: "30",
+              },
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            }
+            await setDoc(doc(db, "userSettings", user.uid), defaultSettings)
+            setSettings((prev) => ({
+              ...prev,
+              security: defaultSettings.security,
+            }))
           }
-          await setDoc(doc(db, "userSettings", user.uid), defaultSettings)
-          setSettings((prev) => ({
-            ...prev,
-            security: defaultSettings.security,
-          }))
+          setNotification({
+            show: false,
+            message: "",
+            type: "success",
+          })
+        } catch (error) {
+          console.error("Error processing settings:", error)
+          setNotification({
+            show: true,
+            message: "Failed to load settings. Please try again.",
+            type: "error",
+          })
+        } finally {
+          setLoading(false)
         }
-      } catch (error) {
+      },
+      (error) => {
         console.error("Error fetching settings:", error)
         setNotification({
           show: true,
           message: "Failed to load settings. Please try again.",
           type: "error",
         })
-      } finally {
         setLoading(false)
       }
-    }
+    )
 
-    fetchSettings()
+    return () => unsubscribe()
   }, [user])
 
   // Fetch user sessions and trusted devices from Firestore

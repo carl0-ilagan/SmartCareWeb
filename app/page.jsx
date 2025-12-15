@@ -11,6 +11,43 @@ import { SignupModal } from "@/components/signup-modal"
 import { collection, query, where, getDocs, orderBy, limit, onSnapshot, getDoc, doc, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
+// Helper function to format base64 image URL
+// Converts base64 strings to data URLs if they don't already have the data: prefix
+function formatImageUrl(url) {
+  if (!url) return null
+  
+  // If it's already a data URL, return as is
+  if (url.startsWith('data:')) {
+    return url
+  }
+  
+  // If it's a regular URL (http/https), return as is
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+  
+  // Otherwise, assume it's a base64 string without prefix
+  // Try to detect image type from the base64 string or default to jpeg
+  let contentType = 'image/jpeg'
+  
+  // Base64 image detection: first character can indicate image type
+  // / = JPEG, i = PNG, R = GIF, U = WEBP
+  if (url.length > 0) {
+    const firstChar = url.charAt(0)
+    if (firstChar === '/') {
+      contentType = 'image/jpeg'
+    } else if (firstChar === 'i') {
+      contentType = 'image/png'
+    } else if (firstChar === 'R') {
+      contentType = 'image/gif'
+    } else if (firstChar === 'U') {
+      contentType = 'image/webp'
+    }
+  }
+  
+  return `data:${contentType};base64,${url}`
+}
+
 // Contact Form Component
 function ContactForm({ contactEmail = "smartcarefamily@gmail.com", brandName = "Smart Care" }) {
   const [formData, setFormData] = useState({
@@ -291,6 +328,7 @@ This message was sent from the ${brandName} contact form. You can reply directly
 function TestimonialsCarousel({ testimonials }) {
   const [expandedTestimonials, setExpandedTestimonials] = useState(new Set())
   const [currentPage, setCurrentPage] = useState(0)
+  const [imageErrors, setImageErrors] = useState(new Set())
   const itemsPerPage = 3
   
   // Limit to 6 testimonials max
@@ -328,6 +366,8 @@ function TestimonialsCarousel({ testimonials }) {
     setCurrentPage(page)
     // Reset expanded testimonials when changing page
     setExpandedTestimonials(new Set())
+    // Reset image errors when changing page to allow retry
+    setImageErrors(new Set())
   }
 
   return (
@@ -348,13 +388,13 @@ function TestimonialsCarousel({ testimonials }) {
                   {/* Doctor Header */}
                   <div className="flex items-start gap-2 sm:gap-3 mb-3 sm:mb-4">
                     <div className="h-12 w-12 sm:h-14 sm:w-14 overflow-hidden rounded-full ring-2 ring-blue-200/50 group-hover:ring-blue-400/60 transition-all duration-300 shadow-sm flex-shrink-0">
-                      {testimonial.avatarSrc ? (
+                      {testimonial.avatarSrc && !imageErrors.has(`doctor-${globalIndex}`) ? (
                         <img
                           src={testimonial.avatarSrc}
                           alt={testimonial.name}
                           className="h-full w-full object-cover"
-                          onError={(e) => {
-                            e.target.src = "/placeholder.svg"
+                          onError={() => {
+                            setImageErrors(prev => new Set(prev).add(`doctor-${globalIndex}`))
                           }}
                         />
                       ) : (
@@ -460,13 +500,13 @@ function TestimonialsCarousel({ testimonials }) {
                 {/* Patient Header */}
                 <div className="flex items-start gap-2 sm:gap-3 mb-3 sm:mb-4">
                   <div className="h-12 w-12 sm:h-14 sm:w-14 overflow-hidden rounded-full ring-2 ring-teal-200/50 group-hover:ring-teal-400/60 transition-all duration-300 shadow-sm flex-shrink-0">
-                    {testimonial.avatarSrc ? (
+                    {testimonial.avatarSrc && !imageErrors.has(`patient-${globalIndex}`) ? (
                       <img
                         src={testimonial.avatarSrc}
                         alt={testimonial.name}
                         className="h-full w-full object-cover"
-                        onError={(e) => {
-                          e.target.src = "/placeholder.svg"
+                        onError={() => {
+                          setImageErrors(prev => new Set(prev).add(`patient-${globalIndex}`))
                         }}
                       />
                     ) : (
@@ -911,7 +951,7 @@ export default function HomePage() {
                 userId: data.userId,
                 name: data.userName || "Anonymous",
                 testimonial: data.message || "",
-                avatarSrc: data.userProfile || null,
+                avatarSrc: formatImageUrl(data.userProfile) || null,
                 userRole: data.userRole,
                 specialty: data.specialty,
                 createdAt: data.createdAt || docSnap.data().createdAt || null,
@@ -930,7 +970,7 @@ export default function HomePage() {
                     const isDoctor = item.userRole === "doctor" || userData.role === "doctor"
                     return {
                       ...item,
-                      avatarSrc: item.avatarSrc || userData.photoURL || null,
+                      avatarSrc: item.avatarSrc || formatImageUrl(userData.photoURL) || null,
                       name: item.name || userData.displayName || userData.name || "Anonymous",
                       userRole: isDoctor ? "doctor" : "patient",
                       specialty: item.specialty || userData.specialty || userData.specialization || userData.speciality || null,

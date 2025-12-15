@@ -1,8 +1,7 @@
 rules_version = '2';
 
-// Craft rules based on data in your Firestore database
-// allow write: if firestore.get(
-//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
+// Note: Firebase Storage is not used - all images are stored as base64 in Firestore
+// These rules are kept for reference but won't be used
 service firebase.storage {
   match /b/{bucket}/o {
     match /{allPaths=**} {

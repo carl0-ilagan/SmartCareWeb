@@ -56,12 +56,14 @@ export default function RoomPage({ params }) {
 
   const getRedirectPath = (callData) => {
     const role = userRole || callData?.callerRole || callData?.receiverRole || callData?.role
+    // Explicitly redirect to correct dashboards
     if (role === "doctor") return "/doctor/dashboard"
     if (role === "admin") return "/admin/dashboard"
     // Fallback: if current path is under /doctor, keep doctor dashboard
     if (typeof window !== "undefined" && window.location.pathname.startsWith("/doctor")) {
       return "/doctor/dashboard"
     }
+    // Default to patient dashboard
     return "/dashboard"
   }
 
@@ -205,7 +207,7 @@ export default function RoomPage({ params }) {
           console.log("❌ Room does not exist, redirecting to dashboard...")
           if (!hasShownEndedToastRef.current) {
             toast({
-              title: "Room already ended",
+              title: "The room already ended",
               description: "This room is no longer available.",
               variant: "destructive",
             })
@@ -213,7 +215,8 @@ export default function RoomPage({ params }) {
           }
           if (typeof window !== "undefined") {
             setTimeout(() => {
-              window.location.assign(getRedirectPath())
+              const redirectPath = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
+              window.location.assign(redirectPath)
             }, 150)
           }
           return
@@ -226,7 +229,7 @@ export default function RoomPage({ params }) {
           console.log("❌ Room is ended/inactive, cannot join. Redirecting to dashboard...")
           if (!hasShownEndedToastRef.current) {
             toast({
-              title: "Room already ended",
+              title: "The room already ended",
               description: "This room is no longer available.",
               variant: "destructive",
             })
@@ -234,7 +237,8 @@ export default function RoomPage({ params }) {
           }
           if (typeof window !== "undefined") {
             setTimeout(() => {
-              window.location.assign(getRedirectPath(callData))
+              const redirectPath = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
+              window.location.assign(redirectPath)
             }, 150)
           }
           return
@@ -262,8 +266,19 @@ export default function RoomPage({ params }) {
           // Re-validate active status prior to joining - prevent joining if ended
           if (callData.status === "ended" || callData.status === "cancelled" || callData.status === "closed" || callData.revokedBy) {
             console.log("❌ Cannot join: Room is ended. Redirecting to dashboard...")
+            if (!hasShownEndedToastRef.current) {
+              toast({
+                title: "The room already ended",
+                description: "This room is no longer available.",
+                variant: "destructive",
+              })
+              hasShownEndedToastRef.current = true
+            }
             if (typeof window !== "undefined") {
-              setTimeout(() => window.location.assign(getRedirectPath(callData)), 150)
+              setTimeout(() => {
+                const redirectPath = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
+                window.location.assign(redirectPath)
+              }, 150)
             }
             return
           }
@@ -363,7 +378,7 @@ export default function RoomPage({ params }) {
             console.log("❌ Room was deleted, redirecting to dashboard...")
             if (!hasShownEndedToastRef.current) {
               toast({
-                title: "Room already ended",
+                title: "The room already ended",
                 description: "The call has been closed.",
                 variant: "destructive",
               })
@@ -373,7 +388,8 @@ export default function RoomPage({ params }) {
             try { if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t)=>t.stop()) } catch {}
             if (typeof window !== "undefined") {
               setTimeout(() => {
-                window.location.assign(getRedirectPath())
+                const redirectPath = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
+                window.location.assign(redirectPath)
               }, 150)
             }
             return
@@ -384,7 +400,7 @@ export default function RoomPage({ params }) {
             console.log("❌ Room was ended, redirecting to dashboard...")
             if (!hasShownEndedToastRef.current) {
               toast({
-                title: "Room already ended",
+                title: "The room already ended",
                 description: "The call has been closed.",
                 variant: "destructive",
               })
@@ -394,7 +410,8 @@ export default function RoomPage({ params }) {
             try { if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t)=>t.stop()) } catch {}
             if (typeof window !== "undefined") {
               setTimeout(() => {
-                window.location.assign(userRole === "doctor" ? "/doctor/dashboard" : "/dashboard")
+                const redirectPath = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
+                window.location.assign(redirectPath)
               }, 150)
             }
             return
@@ -687,14 +704,15 @@ export default function RoomPage({ params }) {
         // Notify once and redirect both doctor and patient to their respective dashboards when call is ended
         if (!hasShownEndedToastRef.current) {
           toast({
-            title: "Room already ended",
+            title: "The room already ended",
             description: "The call has been closed.",
             variant: "destructive",
           })
           hasShownEndedToastRef.current = true
         }
         setTimeout(() => {
-          window.location.assign(getRedirectPath())
+          const redirectPath = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
+          window.location.assign(redirectPath)
         }, 150)
       }
     }

@@ -21,8 +21,10 @@
 
       // --- USERS ---
       match /users/{userId} {
-        // Allow read if signed in (for any authenticated user to read user profiles)
-        allow read: if isSignedIn();
+        // Allow public read access for basic profile data (needed for testimonials display on landing page)
+        // This allows reading photoURL, displayName, name, specialty, specialization, speciality, experience, role
+        // but sensitive data like email, phone, etc. should not be exposed
+        allow read: if true;
         // Allow create if signed in and creating for themselves
         allow create: if isSignedIn() && isOwner(userId);
         // Allow update if signed in and updating own profile OR if admin

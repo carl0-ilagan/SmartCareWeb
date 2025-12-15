@@ -970,6 +970,7 @@ export default function HomePage() {
                     const isDoctor = item.userRole === "doctor" || userData.role === "doctor"
                     return {
                       ...item,
+                      // Use testimonial data first, then fallback to user data
                       avatarSrc: item.avatarSrc || formatImageUrl(userData.photoURL) || null,
                       name: item.name || userData.displayName || userData.name || "Anonymous",
                       userRole: isDoctor ? "doctor" : "patient",
@@ -980,9 +981,12 @@ export default function HomePage() {
                     }
                   }
                 }
+                // If no userId or user doc doesn't exist, return item as-is
                 return item
               } catch (err) {
-                console.warn("Failed to enrich testimonial user data", err)
+                // Silently handle permission errors or other issues - use testimonial data only
+                console.warn("Failed to enrich testimonial user data for userId:", item.userId, err.message)
+                // Return item with existing data (from testimonial document)
                 return item
               }
             })

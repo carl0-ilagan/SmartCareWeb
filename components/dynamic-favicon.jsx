@@ -7,7 +7,7 @@ import { db } from "@/lib/firebase"
 export function DynamicFavicon() {
   useEffect(() => {
     // Default favicon fallback
-    const defaultFavicon = "/SmartCare.png?v=2"
+    const defaultFavicon = "/smarrtcare.png?v=2"
     
     // Function to update favicon in document head
     const updateFavicon = (faviconUrl) => {
@@ -27,18 +27,31 @@ export function DynamicFavicon() {
         link.setAttribute("type", "image/png")
       }
       
-      // Update all favicon types
+      // Update all favicon types - use multiple selectors to catch all variations
       updateFaviconLink("icon", url)
       updateFaviconLink("shortcut icon", url)
       updateFaviconLink("apple-touch-icon", url)
+      
+      // Also update any existing favicon links that might have different rel attributes
+      const allFaviconLinks = document.querySelectorAll('link[rel*="icon"]')
+      allFaviconLinks.forEach((link) => {
+        const timestamp = new Date().getTime()
+        link.setAttribute("href", `${url.split('?')[0]}?t=${timestamp}`)
+        link.setAttribute("type", "image/png")
+      })
       
       // Also update manifest.json icon if needed (for PWA)
       // Note: manifest.json is static, but browsers cache it
       // The service worker will handle PWA icon updates
     }
     
-    // Set initial favicon
+    // Set initial favicon immediately - force update
     updateFavicon(defaultFavicon)
+    
+    // Force update again after a short delay to ensure it takes effect
+    setTimeout(() => {
+      updateFavicon(defaultFavicon)
+    }, 100)
     
     // Listen to Firestore for real-time favicon updates
     const landingDocRef = doc(db, "system", "landing_page")

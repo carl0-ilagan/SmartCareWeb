@@ -16,6 +16,11 @@ export const metadata = {
   title: "Smart Care - Your Health, One Click Away",
   description: "A modern telehealth platform for all your healthcare needs",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/smarrtcare.png",
+    shortcut: "/smarrtcare.png",
+    apple: "/smarrtcare.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -41,9 +46,9 @@ export default function RootLayout({ children }) {
     <html lang="en" suppressHydrationWarning className={manrope.variable}>
       <head>
         <title>Smart care</title>
-        <link rel="icon" href="/SmartCare.png?v=2" type="image/png" />
-        <link rel="shortcut icon" href="/SmartCare.png?v=2" type="image/png" />
-        <link rel="apple-touch-icon" href="/SmartCare.png?v=2" />
+        <link rel="icon" href="/smarrtcare.png?v=2" type="image/png" />
+        <link rel="shortcut icon" href="/smarrtcare.png?v=2" type="image/png" />
+        <link rel="apple-touch-icon" href="/smarrtcare.png?v=2" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#f59e0b" />
         <meta name="mobile-web-app-capable" content="yes" />

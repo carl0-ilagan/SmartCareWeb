@@ -67,7 +67,7 @@ const urlsToCache = [
   '/admin/messages',
   
   // Assets
-  '/SmartCare.png',
+  '/smarrtcare.png',
   '/manifest.json',
   '/favicon.ico',
   '/logo.svg',
@@ -529,7 +529,7 @@ self.addEventListener('fetch', (event) => {
   if (pathname === '/manifest.json') {
     event.respondWith(
       (async () => {
-        const iconUrl = latestBrandingIcon || '/SmartCare.png'
+        const iconUrl = latestBrandingIcon || '/smarrtcare.png'
         const ts = Date.now()
         const manifest = {
           name: 'Smart Care - Healthcare Platform',
@@ -741,8 +741,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Smart Care'
   const options = {
     body: data.body || 'You have a new notification',
-    icon: '/SmartCare.png',
-    badge: '/SmartCare.png',
+    icon: '/smarrtcare.png',
+    badge: '/smarrtcare.png',
     vibrate: [200, 100, 200],
     data: {
       url: data.url || '/',
@@ -760,8 +760,8 @@ self.addEventListener('message', (event) => {
     // Request notification permission if needed
     self.registration.showNotification(payload.title || 'Smart Care', {
       body: payload.body || 'You have a new notification',
-      icon: payload.icon || '/SmartCare.png',
-      badge: payload.badge || '/SmartCare.png',
+      icon: payload.icon || '/smarrtcare.png',
+      badge: payload.badge || '/smarrtcare.png',
       vibrate: [200, 100, 200],
       data: payload.data || {},
       tag: payload.tag || 'appointment-notification',

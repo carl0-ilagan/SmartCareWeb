@@ -56,7 +56,14 @@ export function AdminHeaderBanner({ title, subtitle, stats = [], className = "" 
           <div className={`mt-4 grid gap-4 ${stats.length === 1 ? "grid-cols-1" : stats.length === 2 ? "grid-cols-2" : stats.length === 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"}`}>
             {stats.map((stat, index) => (
               <div key={index} className="rounded-lg bg-white/10 p-3 backdrop-blur-sm">
-                <p className="text-xs font-medium uppercase text-white/70">{stat.label}</p>
+                <div className="flex items-center justify-between mb-1">
+                  {stat.icon && (
+                    <div className="text-white/80">
+                      {stat.icon}
+                    </div>
+                  )}
+                  <p className="text-xs font-medium uppercase text-white/70">{stat.label}</p>
+                </div>
                 <p className="text-xl font-bold">{stat.value}</p>
               </div>
             ))}

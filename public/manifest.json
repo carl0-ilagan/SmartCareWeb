@@ -1,0 +1,66 @@
+{
+  "name": "Smart Care - Healthcare Platform",
+  "short_name": "Smart Care",
+  "description": "A modern telehealth platform for all your healthcare needs",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f3f0",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/SmartCare.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/SmartCare.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["healthcare", "medical", "productivity"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Book Appointment",
+      "short_name": "Book",
+      "description": "Book a new appointment with a doctor",
+      "url": "/dashboard/appointments/new",
+      "icons": [{ "src": "/SmartCare.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Messages",
+      "short_name": "Messages",
+      "description": "View your messages",
+      "url": "/dashboard/messages",
+      "icons": [{ "src": "/SmartCare.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Prescriptions",
+      "short_name": "Prescriptions",
+      "description": "View your prescriptions",
+      "url": "/dashboard/prescriptions",
+      "icons": [{ "src": "/SmartCare.png", "sizes": "96x96" }]
+    }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "files",
+          "accept": ["image/*", "application/pdf"]
+        }
+      ]
+    }
+  }
+}
+

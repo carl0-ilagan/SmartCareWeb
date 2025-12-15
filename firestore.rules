@@ -1,0 +1,428 @@
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+
+      // Helper functions
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+      
+      function hasRole(role) {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+      }
+      
+      function isAdmin() {
+        return hasRole('admin') || hasRole('super admin');
+      }
+
+      // --- USERS ---
+      match /users/{userId} {
+        // Allow read if signed in (for any authenticated user to read user profiles)
+        allow read: if isSignedIn();
+        // Allow create if signed in and creating for themselves
+        allow create: if isSignedIn() && isOwner(userId);
+        // Allow update if signed in and updating own profile OR if admin
+        allow update: if isSignedIn() && (isOwner(userId) || isAdmin());
+        // Allow delete only for admins
+        allow delete: if isAdmin();
+        
+        // Subcollections
+        match /trusted/{document=**} {
+          allow read, write: if isSignedIn() && isOwner(userId);
+        }
+        
+        // Device trust subcollection
+        match /devices/{deviceId} {
+          // Allow read if signed in and owns the user document
+          allow read: if isSignedIn() && request.auth.uid == userId;
+          // Allow create if signed in and creating device for themselves
+          // Also allow if deviceId matches the authenticated user's device
+          allow create: if isSignedIn() && 
+            request.auth.uid == userId &&
+            request.resource.data.keys().hasAny(['trusted', 'deviceMetadata', 'ipAddress']);
+          // Allow update if signed in and owns the user document
+          allow update: if isSignedIn() && request.auth.uid == userId;
+          // Allow delete if signed in and owns the user document
+          allow delete: if isSignedIn() && request.auth.uid == userId;
+        }
+      }
+      
+      // Login requests collection
+      match /loginRequests/{requestId} {
+        // Allow read for approval links (public access needed for email links)
+        allow read: if true;
+        // Allow authenticated users to create login requests for themselves
+        allow create: if isSignedIn() && 
+          request.resource.data.uid == request.auth.uid &&
+          request.resource.data.status == "pending";
+        // Allow update only if user owns the request (for status updates)
+        allow update: if isSignedIn() && 
+          resource.data.uid == request.auth.uid;
+        // Allow delete if user owns the request
+        allow delete: if isSignedIn() && 
+          resource.data.uid == request.auth.uid;
+      }
+
+      // --- USER SETTINGS ---
+      match /userSettings/{userId} {
+        // Allow read if signed in and owns the settings
+        allow read: if isSignedIn() && request.auth.uid == userId;
+        // Allow create if signed in and creating for themselves
+        allow create: if isSignedIn() && request.auth.uid == userId;
+        // Allow update if signed in and owns the settings
+        allow update: if isSignedIn() && request.auth.uid == userId;
+        // Allow delete if signed in and owns the settings
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // --- DOCTOR AVAILABILITY ---
+      match /doctorAvailability/{doctorId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == doctorId;
+      }
+
+      // --- APPOINTMENTS ---
+      match /appointments/{appointmentId} {
+        allow read: if request.auth != null && 
+          (request.auth.uid == resource.data.patientId || 
+          request.auth.uid == resource.data.doctorId);
+
+        allow list: if request.auth != null;
+
+        allow create: if request.auth != null &&
+          (request.auth.uid == request.resource.data.patientId || 
+          request.auth.uid == request.resource.data.doctorId);
+
+        allow update: if request.auth != null &&
+          (request.auth.uid == resource.data.patientId || 
+          request.auth.uid == resource.data.doctorId);
+      }
+
+      // --- CONVERSATIONS ---
+      match /conversations/{conversationId} {
+        allow read, write: if request.auth != null &&
+          request.auth.uid in resource.data.participants;
+
+        allow create: if request.auth != null &&
+          request.resource.data.participants is list &&
+          request.auth.uid in request.resource.data.participants;
+
+        // --- MESSAGES SUBCOLLECTION ---
+        match /messages/{messageId} {
+          allow read, write: if request.auth != null &&
+            request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+
+          allow create, update: if request.auth != null &&
+            request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
+            (
+              request.resource.data.fileData == null || 
+              request.resource.data.fileData.size <= 10000000 // Increased to 10MB for file attachments
+            );
+        }
+      }
+
+      // --- CALLS & WEBRTC SIGNALING ---
+      match /calls/{callId} {
+        // Allow read if user is caller, receiver, or in participants list
+        allow read: if request.auth != null && (
+          request.auth.uid == resource.data.callerId ||
+          request.auth.uid == resource.data.receiverId ||
+          (resource.data.participants is list && request.auth.uid in resource.data.participants)
+        );
+
+        // TEMP relaxed rules for testing room creation from the doctor side
+        // Create if the authenticated user is the caller; receiverId may be null
+        allow create: if request.auth != null &&
+          request.auth.uid == request.resource.data.callerId &&
+          request.resource.data.type in ['voice', 'video'] &&
+          request.resource.data.status in ['pending', 'ringing'];
+
+        // Allow update by participants; relax status transitions for testing
+        allow update: if request.auth != null && (
+          request.auth.uid == resource.data.callerId ||
+          request.auth.uid == resource.data.receiverId
+        );
+      }
+
+      // --- ICE CANDIDATES SUBCOLLECTION ---
+      match /calls/{callId}/candidates/{candidateId} {
+        allow read, write: if request.auth != null && (
+          request.auth.uid == get(/databases/$(database)/documents/calls/$(callId)).data.callerId ||
+          request.auth.uid == get(/databases/$(database)/documents/calls/$(callId)).data.receiverId ||
+          (get(/databases/$(database)/documents/calls/$(callId)).data.participants is list &&
+          request.auth.uid in get(/databases/$(database)/documents/calls/$(callId)).data.participants)
+        );
+      }
+
+      // --- CALL HISTORY ---
+      match /callHistory/{historyId} {
+        allow read: if request.auth != null && (
+          request.auth.uid == resource.data.callerId ||
+          request.auth.uid == resource.data.receiverId
+        );
+        
+        allow create: if request.auth != null && (
+          request.auth.uid == request.resource.data.callerId ||
+          request.auth.uid == request.resource.data.receiverId
+        );
+        
+        allow update: if request.auth != null && (
+          request.auth.uid == resource.data.callerId ||
+          request.auth.uid == resource.data.receiverId
+        );
+      }
+
+      // --- ACTIVE CALL STATUS ---
+      match /activeCall/{userId} {
+        // Allow read for anyone authenticated
+        allow read: if request.auth != null;
+        
+        // Allow write if user is involved in the call
+        allow write: if request.auth != null && (
+          // User can update their own status
+          request.auth.uid == userId ||
+          // Or if they're in a call with this user
+          (
+            request.resource.data.keys().hasAll(['callId', 'type', 'status', 'initiatorInfo']) &&
+            (
+              request.resource.data.initiatorInfo.userId == request.auth.uid ||
+              request.resource.data.receiverId == request.auth.uid
+            )
+          )
+        );
+        
+        // Allow create/update with validation
+        allow create, update: if request.auth != null && (
+          // User can create/update their own status
+          request.auth.uid == userId ||
+          // Or if they're in a call with this user
+          (
+            request.resource.data.keys().hasAll(['callId', 'type', 'status', 'initiatorInfo']) &&
+            (
+              request.resource.data.initiatorInfo.userId == request.auth.uid ||
+              request.resource.data.receiverId == request.auth.uid
+            )
+          )
+        ) && (
+          // Validate status
+          request.resource.data.status in ['ringing', 'accepted', 'rejected', 'ended']
+        );
+      }
+
+      // --- SIGNALING SESSION (for exchanging offers/answers) ---
+      match /signaling/{sessionId} {
+        allow read: if request.auth != null &&
+          request.auth.uid in resource.data.participants;
+
+        allow create: if request.auth != null &&
+          request.auth.uid in request.resource.data.participants;
+          
+        allow update: if request.auth != null &&
+          request.auth.uid in resource.data.participants;
+      }
+
+      // --- RTC CONFIG (TURN/STUN credentials) ---
+      match /rtcConfig/{configId} {
+        // Anyone authenticated can read the TURN/STUN server config
+        allow read: if request.auth != null;
+        
+        // Only admins can update the config
+        allow write: if request.auth != null &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      }
+
+      // --- PRESCRIPTIONS ---
+      match /prescriptions/{prescriptionId} {
+        allow read: if request.auth != null &&
+          (request.auth.uid == resource.data.patientId ||
+          request.auth.uid == resource.data.doctorId);
+
+        allow create: if request.auth != null &&
+          request.auth.uid == request.resource.data.doctorId;
+
+        // Doctors can update any field, patients can only update download status
+        allow update: if request.auth != null && (
+          (request.auth.uid == resource.data.doctorId) ||
+          (request.auth.uid == resource.data.patientId && 
+          // Ensure patientId and doctorId haven't changed
+          request.resource.data.patientId == resource.data.patientId &&
+          request.resource.data.doctorId == resource.data.doctorId &&
+          // Ensure downloadedByPatient is being set to true
+          request.resource.data.downloadedByPatient == true &&
+          request.resource.data.downloadedAt is string)
+        );
+      }
+
+      // --- MEDICAL RECORDS ---
+      match /medicalRecords/{recordId} {
+        allow read: if request.auth != null;
+
+        allow create: if request.auth != null;
+
+        allow update, delete: if request.auth != null &&
+          request.auth.uid == resource.data.patientId;
+
+        allow update: if request.auth != null &&
+          (request.auth.uid == resource.data.patientId || 
+          request.auth.uid in resource.data.sharedWith);
+      }
+
+      // --- FEEDBACK ---
+      match /feedback/{feedbackId} {
+        allow read: if request.auth != null && (
+          request.auth.uid == resource.data.userId ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        );
+
+        allow create: if request.auth != null;
+
+        allow update: if request.auth != null && (
+          request.auth.uid == resource.data.userId ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        );
+        
+        // Add explicit delete permission for users who created the feedback
+        allow delete: if request.auth != null && 
+          request.auth.uid == resource.data.userId;
+      }
+
+      // --- NOTIFICATIONS ---
+      match /notifications/{notificationId} {
+        allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && request.auth.uid == resource.data.userId;
+        allow delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+      }
+
+      // --- LOGS ---
+      match /logs/{logId} {
+        // Allow any authenticated user to create logs
+        allow create: if request.auth != null;
+        
+        // Only admins can read all logs
+        allow read: if request.auth != null &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      }
+
+      // --- SYSTEM COLLECTION (for welcome content, landing page, etc.) ---
+      match /system/{docId} {
+        // Allow read access to all users (even unauthenticated)
+        allow read: if true;
+        
+        // Allow write access to authenticated users for testing purposes
+        // In production, you should restrict this to admins only
+        allow write: if request.auth != null;
+      }
+
+      // Add this rule for system_metrics collection before the final admin access rule
+      // This allows anyone to read system metrics, but only the server to write them
+
+      // --- SYSTEM METRICS ---
+      match /system_metrics/{metricId} {
+        // Allow read access to authenticated users
+        allow read: if request.auth != null;
+        
+        // Allow write access from server-side code
+        // Since we can't authenticate server-side code easily without Admin SDK,
+        // we'll use a special condition to identify server requests
+        allow write: if true; // For now, allow all writes to this collection
+      }
+
+      // --- TESTIMONIALS (published, globally visible) ---
+      match /testimonials/{testimonialId} {
+        // Everyone can read published testimonials
+        allow read: if true;
+        // Allow any signed-in user to create a testimonial (no rating required)
+        allow create: if isSignedIn()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.message is string
+          && request.resource.data.message.size() > 0;
+        // Allow owners to edit/delete their own testimonial; admins can also manage
+        // For update: user must own the testimonial (userId matches) and cannot change userId
+        allow update: if isSignedIn() && (
+          (resource.data.userId == request.auth.uid && 
+           request.resource.data.userId == resource.data.userId) ||
+          isAdmin()
+        );
+        allow delete: if (isSignedIn() && request.auth.uid == resource.data.userId) || isAdmin();
+      }
+
+      // --- TESTIMONIAL SUBMISSIONS (pending review) ---
+      match /testimonials_submissions/{submissionId} {
+        // Users can submit their own testimonial
+        allow create: if isSignedIn()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.rating is number
+          && request.resource.data.rating >= 1
+          && request.resource.data.rating <= 5
+          && request.resource.data.message is string
+          && request.resource.data.message.size() > 0;
+
+        // Optional: allow users to read their own submission status
+        allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
+
+        // Updates/deletes restricted to admins
+        allow update, delete: if isAdmin();
+      }
+
+      // Sessions collection
+      match /sessions/{sessionId} {
+        // Allow read if signed in and owns the session
+        allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
+        // Allow list/query if signed in (needed for session history checks)
+        allow list: if isSignedIn();
+        // Allow create if signed in and creating session for themselves
+        allow create: if isSignedIn() && 
+          request.auth.uid == request.resource.data.userId &&
+          request.resource.data.keys().hasAll(['userId', 'userEmail', 'deviceName', 'ipAddress', 'lastActive']);
+        // Allow update if signed in and owns the session
+        allow update: if isSignedIn() && request.auth.uid == resource.data.userId;
+        // Allow delete if signed in and owns the session
+        allow delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+      }
+      
+      // Suspicious logins collection
+      match /suspiciousLogins/{loginId} {
+        allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && request.auth.uid == resource.data.userId;
+        allow delete: if isAdmin();
+      }
+      
+      // Failed logins collection
+      match /failedLogins/{loginId} {
+        allow read: if isSignedIn() && (request.auth.uid == resource.data.userId || isAdmin());
+        allow create: if true; // Allow anonymous creation for failed login tracking
+        allow update, delete: if isAdmin();
+      }
+      
+      // Rejected logins collection
+      match /rejectedLogins/{loginId} {
+        allow read: if isSignedIn() && (request.auth.uid == resource.data.userId || isAdmin());
+        allow create: if isSignedIn();
+        allow update, delete: if isAdmin();
+      }
+
+      // --- CONTACT MESSAGES ---
+      match /contact_messages/{messageId} {
+        // Allow read for admins only
+        allow read: if isAdmin();
+        // Allow create for anyone (contact form submissions)
+        allow create: if true;
+        // Allow update for admins only (mark as read, star, etc.)
+        allow update: if isAdmin();
+        // Allow delete for admins only
+        allow delete: if isAdmin();
+      }
+
+      // --- ADMIN ACCESS TO EVERYTHING ---
+      match /{document=**} {
+        allow read, write: if request.auth != null &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      }
+    }
+  }

@@ -1,0 +1,352 @@
+================================================================================
+                    SMART CARE SYSTEM - COMPLETE OVERVIEW
+================================================================================
+
+SYSTEM OVERVIEW
+---------------
+Smart Care ay isang real-time telehealth platform na may PWA support para sa 
+Holy Infant Saviour Somos Hospital and Medical Center Inc. Built gamit ang 
+Next.js, WebRTC, at Firebase.
+
+================================================================================
+                            CORE FEATURES
+================================================================================
+
+1. USER MANAGEMENT & AUTHENTICATION
+   - Multi-role registration: Patient, Doctor, Admin
+   - Role-based access control (RBAC)
+   - Account approval system (Admin approves/rejects accounts)
+   - Device authentication & trust system
+   - Session management with timeout protection
+   - Suspicious login detection (IP, device tracking)
+   - Email verification
+
+2. APPOINTMENT SYSTEM
+   - Online & in-person appointments
+   - Real-time availability management (Doctor sets availability)
+   - Appointment booking, editing, cancellation
+   - Appointment reminders & notifications
+   - Calendar integration
+   - Appointment history
+   - Status tracking (pending, approved, completed, cancelled)
+
+3. REAL-TIME COMMUNICATION
+
+   Video Conferencing:
+   - WebRTC-based video calls
+   - Screen sharing
+   - Audio/video controls (mute, camera on/off)
+   - Room-based calls (Doctor creates, invites Patient)
+   - Auto-redirect to dashboard when call ends
+   - Call quality monitoring
+
+   Voice Calls:
+   - Audio-only calls
+   - Call duration tracking
+   - Call history
+
+   Messaging/Chat:
+   - Real-time text messaging
+   - File & image sharing
+   - Message read receipts
+   - Online/offline status
+   - Conversation history
+   - Secure messaging between Patient-Doctor
+
+4. E-PRESCRIPTION SYSTEM
+   - Digital prescription creation (Doctor)
+   - Electronic signature
+   - Prescription delivery to patients
+   - Prescription history
+   - Medication details (name, dosage, frequency, duration)
+   - PDF export
+
+5. MEDICAL RECORDS MANAGEMENT
+   - Document upload/view/share
+   - Patient-controlled sharing (selective record sharing)
+   - Medical history tracking
+   - Record organization by category
+   - Secure document storage
+
+6. ADMIN FEATURES
+
+   Account Management:
+   - Approve/reject patient & doctor accounts
+   - User role management
+   - Account status monitoring
+   - Pending accounts dashboard
+
+   Content Management:
+   - Landing page editor (fully customizable)
+     * Hero section, features, testimonials
+     * Contact information, map location
+     * Footer content, social links
+     * Dynamic testimonial selection (admin selects which testimonials show)
+   - Information pages editor (Privacy, Terms, etc.)
+   - Logo & branding management
+
+   Communication Management:
+   - Unified inbox (Contact form + Gmail integration)
+   - Gmail API integration (fetch emails directly)
+   - Reply to messages directly from admin panel
+   - Message filtering (All, Contact, Gmail, Unread, Read, Starred)
+   - Search functionality
+
+   Analytics & Monitoring:
+   - System metrics dashboard
+   - Activity logs
+   - User analytics
+   - Appointment statistics
+   - Prescription statistics
+   - Real-time system monitoring
+
+   Feedback Management:
+   - User feedback collection
+   - Testimonial management
+   - Landing page testimonial selection
+   - Feedback review & moderation
+
+   Data Management:
+   - JSON backup system (Admin can trigger daily backups)
+   - System logs
+   - Reports generation
+
+7. NOTIFICATIONS SYSTEM
+   - In-app notifications
+   - Email notifications
+   - Push notifications (PWA)
+   - Real-time notification delivery
+   - Notification history
+   - Notification preferences
+
+8. PWA (PROGRESSIVE WEB APP)
+   - Installable web app
+   - Offline support (Service Worker)
+   - App-like experience
+   - Mobile-responsive design
+   - Offline page caching
+   - Background sync capabilities
+
+9. SECURITY FEATURES
+   - Encrypted transport (HTTPS)
+   - Role-based access control
+   - Firestore security rules
+   - Audit logging
+   - Device trust system
+   - Session timeout protection
+   - IP tracking & suspicious login detection
+
+================================================================================
+        UNIQUE DIFFERENTIATORS VS. EXISTING TELEHEALTH SYSTEMS
+================================================================================
+
+1. UNIFIED COMMUNICATION HUB
+   - Gmail Integration: Admin can fetch at reply sa Gmail emails directly sa 
+     platform
+   - Contact form + Gmail unified inbox
+   - Hindi kailangan mag-switch sa external email clients
+
+2. FULLY CUSTOMIZABLE LANDING PAGE
+   - Admin can edit lahat ng landing page content without code
+   - Dynamic testimonial selection (admin chooses which testimonials to display)
+   - Real-time updates (no page refresh needed)
+   - Map location configuration
+   - Branding customization
+
+3. ADVANCED ROOM CALL SYSTEM
+   - Doctor-initiated room calls with patient invitations
+   - Screen sharing support
+   - Auto-redirect to dashboard when call ends
+   - Room protection (ended rooms cannot be rejoined)
+   - Real-time participant management
+
+4. DEVICE AUTHENTICATION & TRUST SYSTEM
+   - Device approval workflow
+   - Trusted device management
+   - Suspicious login detection
+   - IP-based security tracking
+   - Email-based device approval
+
+5. COMPREHENSIVE ADMIN CONTROL
+   - Account approval workflow
+   - Content management without developer
+   - Unified message management
+   - System monitoring & analytics
+   - Backup system
+
+6. PWA-FIRST APPROACH
+   - Full offline support
+   - Installable on any device
+   - App-like experience without app store
+   - Service Worker for offline functionality
+   - Mobile-optimized for PWA
+
+7. REAL-TIME EVERYTHING
+   - Real-time updates via Firestore listeners
+   - Live notifications
+   - Real-time chat
+   - Real-time appointment updates
+   - Real-time testimonial updates
+
+8. PATIENT-CONTROLLED RECORD SHARING
+   - Patients control which records to share
+   - Selective sharing with doctors
+   - Privacy-focused approach
+
+9. INTEGRATED FEEDBACK & TESTIMONIAL SYSTEM
+   - Built-in feedback collection
+   - Testimonial management
+   - Dynamic landing page testimonials
+   - Admin moderation
+
+10. NO PAYMENT INTEGRATION REQUIRED
+    - Focus on core healthcare communication
+    - No billing complexity
+    - Free for hospital use
+
+================================================================================
+                        TECHNICAL ARCHITECTURE
+================================================================================
+
+FRONTEND:
+---------
+- Next.js 15 (App Router)
+- React 19
+- Tailwind CSS
+- PWA Support
+- Responsive Design
+
+BACKEND:
+--------
+- Firebase Authentication
+- Firestore (Real-time database)
+- Firebase Storage
+- Cloud Functions (if needed)
+
+REAL-TIME COMMUNICATION:
+------------------------
+- WebRTC (Video/Voice calls)
+- Firestore Real-time listeners
+- WebSocket-like functionality
+
+ADDITIONAL INTEGRATIONS:
+------------------------
+- Gmail API (OAuth 2.0)
+- Nodemailer (SMTP email)
+- Google Maps Embed API
+
+================================================================================
+                    SYSTEM LIMITATIONS (AS DESIGNED)
+================================================================================
+- No integrated payment system
+- Requires stable internet (performance degrades in low connectivity)
+- Cloud dependency (Firebase)
+- No AI-assisted diagnostics
+- Limited language options
+- Regional compliance may require additional steps
+
+================================================================================
+              SUMMARY: WHY IT'S DIFFERENT FROM OTHER SYSTEMS
+================================================================================
+
+1. ALL-IN-ONE PLATFORM
+   - Communication, appointments, prescriptions, records, admin tools - lahat 
+     nasa isang system
+
+2. ADMIN CONTROL
+   - Full content management without coding
+   - Edit landing page, testimonials, branding - lahat editable by admin
+
+3. UNIFIED INBOX
+   - Contact form + Gmail in one place
+   - Reply directly from platform
+
+4. PWA-FIRST
+   - Works offline, installable, app-like experience
+   - No need for app store
+
+5. REAL-TIME UPDATES
+   - Everything updates instantly without refresh
+   - Live notifications, real-time chat
+
+6. SECURITY-FOCUSED
+   - Device trust, suspicious login detection, role-based access
+   - Comprehensive security features
+
+7. CUSTOMIZABLE
+   - Landing page, branding, content - all editable by admin
+   - Dynamic testimonial selection
+
+8. HOSPITAL-SPECIFIC
+   - Designed for Holy Infant Saviour Somos Hospital
+   - Tailored to their needs
+
+================================================================================
+                        FUNCTIONAL REQUIREMENTS
+================================================================================
+
+FR-01: User Registration
+        Patients, doctors, and admins can register/onboard with unique 
+        credentials.
+
+FR-02: User Authentication
+        Secure login, session handling, and role-based access per user type.
+
+FR-03: Appointment Scheduling
+        Patients can book/edit/cancel online or in-person visits; doctors 
+        manage availability.
+
+FR-04: Notifications
+        Send confirmations, reminders, and updates for appointments, 
+        prescriptions, and messages.
+
+FR-05: Messaging
+        Secure text/chat for follow-ups and clarifications between patients 
+        and providers.
+
+FR-06: Video Conferencing
+        Real-time video and audio between patients and doctors.
+
+FR-07: Document Upload/View/Share
+        Upload and view medical documents; patients can share specific records 
+        with providers securely.
+
+FR-08: Prescription Creation
+        Doctors draft e-prescriptions within the system.
+
+FR-09: Digital Signature
+        Doctors sign prescriptions electronically.
+
+FR-10: Prescription Delivery
+        System delivers signed e-prescriptions to patients.
+
+FR-11: Prescription History
+        Patients and doctors can view prior e-prescriptions.
+
+FR-12: Admin Approvals
+        Admins approve or reject patient/doctor accounts.
+
+FR-13: Admin Monitoring/Analytics
+        Admins can review system/activity metrics and logs.
+
+FR-14: Feedback Management
+        Capture and review feedback from users.
+
+FR-15: Backups
+        Admins can trigger daily JSON backups of backend data.
+
+FR-16: PWA Support
+        Installable web app with manifest/offline basics for improved 
+        accessibility.
+
+FR-17: Security
+        Enforce encrypted transport, role-based access, and audit logging 
+        for key actions.
+
+================================================================================
+                              END OF DOCUMENT
+================================================================================
+
+Generated: 2025
+System: Smart Care Telehealth Platform
+For: Holy Infant Saviour Somos Hospital and Medical Center Inc.

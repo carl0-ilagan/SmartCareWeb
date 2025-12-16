@@ -314,13 +314,17 @@ export default function PatientFeedbackPage() {
       return "/admin-interface.png"
     }
 
-    // Ensure URL starts with http:// or https://
-    if (!photoURL.startsWith("http://") && !photoURL.startsWith("https://")) {
-      console.log(`Invalid admin photo URL format: ${photoURL}`)
-      return "/admin-interface.png"
+    // Accept http/https URLs or base64 data URLs (for admin profile photos)
+    if (
+      photoURL.startsWith("http://") ||
+      photoURL.startsWith("https://") ||
+      photoURL.startsWith("data:image/")
+    ) {
+      return photoURL
     }
 
-    return photoURL
+    console.log(`Invalid admin photo URL format: ${photoURL}`)
+    return "/admin-interface.png"
   }
 
   // Get admin name
@@ -693,7 +697,6 @@ export default function PatientFeedbackPage() {
                         <div className="flex items-center mb-2">
                           <div className="relative h-8 w-8 rounded-full overflow-hidden mr-2 bg-earth-beige flex-shrink-0">
                             <ProfileImage
-                              userId={feedback.respondedBy}
                               src={getAdminProfilePic(feedback.respondedBy)}
                               alt={getAdminName(feedback.respondedBy)}
                               className="h-full w-full"

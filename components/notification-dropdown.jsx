@@ -19,6 +19,7 @@ import {
   Edit,
   Bell,
 } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
 import {
   collection,
   query,
@@ -312,6 +313,8 @@ export function NotificationDropdown() {
     )
   }
 
+  const { toast } = useToast()
+
   const handleCallInviteClick = async (notification, e) => {
     try {
       if (notification.type !== "call_invite") return
@@ -324,6 +327,11 @@ export function NotificationDropdown() {
       const callRef = doc(db, "calls", callId)
       const snap = await getDoc(callRef)
       if (!snap.exists()) {
+        toast({
+          title: "Room Already Ended",
+          description: "The room is already ended by the doctor.",
+          variant: "destructive",
+        })
         window.location.assign(isDoctor ? "/doctor/appointments" : "/dashboard/appointments")
         return
       }
@@ -333,6 +341,11 @@ export function NotificationDropdown() {
       if (isActive && notRevoked) {
         window.location.assign(notification.actionLink || (isDoctor ? "/doctor/appointments" : "/dashboard/appointments"))
       } else {
+        toast({
+          title: "Room Already Ended",
+          description: "The room is already ended by the doctor.",
+          variant: "destructive",
+        })
         window.location.assign(isDoctor ? "/doctor/appointments" : "/dashboard/appointments")
       }
     } catch {

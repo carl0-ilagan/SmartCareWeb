@@ -14,9 +14,11 @@ import {
   Users,
   UserCheck,
   AlertCircle,
+  AlertTriangle,
   UserCog,
   CheckCircle,
   ChevronDown,
+  Loader2,
 } from "lucide-react"
 import {
   collection,
@@ -250,9 +252,13 @@ export default function PatientsPage() {
   // Handle patient deactivation
   const handleDeactivatePatient = async () => {
     if (selectedPatient) {
+      if (selectedPatient.status !== "active") {
+        setShowDeactivateModal(false)
+        return
+      }
       try {
         setIsLoading(true)
-        const newStatus = selectedPatient.status === "active" ? "inactive" : "active"
+        const newStatus = "inactive"
 
         await updateDoc(doc(db, "users", selectedPatient.id), {
           status: newStatus,
@@ -277,13 +283,7 @@ export default function PatientsPage() {
         )
 
         // Update stats
-        if (newStatus === "active") {
-          setStats((prev) => ({
-            ...prev,
-            active: prev.active + 1,
-            inactive: prev.inactive - 1,
-          }))
-        } else {
+        if (selectedPatient.status === "active") {
           setStats((prev) => ({
             ...prev,
             active: prev.active - 1,
@@ -297,8 +297,8 @@ export default function PatientsPage() {
         // Show success message
         setActionSuccess({
           show: true,
-          message: `Patient ${selectedPatient.name} has been ${newStatus === "active" ? "activated" : "deactivated"} successfully.`,
-          type: newStatus === "active" ? "activate" : "deactivate",
+          message: `Patient ${selectedPatient.name} has been deactivated successfully.`,
+          type: "deactivate",
         })
 
         // Hide success message after 3 seconds
@@ -421,17 +421,11 @@ export default function PatientsPage() {
       {actionSuccess.show && (
         <div
           className={`mb-6 p-4 rounded-md flex items-center ${
-            actionSuccess.type === "delete"
-              ? "bg-red-50 text-red-800"
-              : actionSuccess.type === "activate"
-                ? "bg-green-50 text-green-800"
-                : "bg-amber-50 text-amber-800"
+            actionSuccess.type === "delete" ? "bg-red-50 text-red-800" : "bg-amber-50 text-amber-800"
           }`}
         >
           {actionSuccess.type === "delete" ? (
             <AlertCircle className="h-5 w-5 mr-2" />
-          ) : actionSuccess.type === "activate" ? (
-            <CheckCircle className="h-5 w-5 mr-2" />
           ) : (
             <UserX className="h-5 w-5 mr-2" />
           )}
@@ -708,21 +702,15 @@ export default function PatientsPage() {
                         >
                           <Eye className="h-5 w-5" />
                         </button>
-                        <button
-                          onClick={(e) => handleActionClick(e, "status", patient)}
-                          className={`p-1.5 rounded-full transition-colors ${
-                            patient.status === "active"
-                              ? "hover:bg-amber-50 text-amber-600"
-                              : "hover:bg-green-50 text-green-600"
-                          }`}
-                          aria-label={patient.status === "active" ? "Deactivate patient" : "Activate patient"}
-                        >
-                          {patient.status === "active" ? (
+                        {patient.status === "active" && (
+                          <button
+                            onClick={(e) => handleActionClick(e, "status", patient)}
+                            className="p-1.5 rounded-full transition-colors hover:bg-amber-50 text-amber-600"
+                            aria-label="Deactivate patient"
+                          >
                             <UserX className="h-5 w-5" />
-                          ) : (
-                            <UserCheck className="h-5 w-5" />
-                          )}
-                        </button>
+                          </button>
+                        )}
                         <button
                           onClick={(e) => handleActionClick(e, "delete", patient)}
                           className="p-1.5 rounded-full hover:bg-red-50 text-red-600 transition-colors"
@@ -757,29 +745,115 @@ export default function PatientsPage() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-in fade-in duration-300">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full animate-in zoom-in-95 duration-300">
-            <h3 className="text-lg font-semibold text-graphite mb-2">Delete Patient</h3>
-            <p className="text-drift-gray mb-4">
-              Are you sure you want to delete {selectedPatient?.name}? This action cannot be undone.
-            </p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 border border-earth-beige rounded-md text-drift-gray hover:bg-pale-stone transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeletePatient}
-                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
-                disabled={isLoading}
-              >
-                {isLoading ? "Deleting..." : "Delete"}
-              </button>
+        <>
+          <style jsx>{`
+            @keyframes fadeIn {
+              from {
+                opacity: 0;
+              }
+              to {
+                opacity: 1;
+              }
+            }
+            @keyframes fadeOut {
+              from {
+                opacity: 1;
+              }
+              to {
+                opacity: 0;
+              }
+            }
+            @keyframes modalIn {
+              from {
+                opacity: 0;
+                transform: scale(0.95) translateY(-10px);
+              }
+              to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+              }
+            }
+            @keyframes modalOut {
+              from {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+              }
+              to {
+                opacity: 0;
+                transform: scale(0.95) translateY(10px);
+              }
+            }
+            .animate-fade-in {
+              animation: fadeIn 0.3s ease-out;
+            }
+            .animate-fade-out {
+              animation: fadeOut 0.3s ease-out;
+            }
+            .animate-modal-in {
+              animation: modalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            }
+            .animate-modal-out {
+              animation: modalOut 0.3s ease-in;
+            }
+          `}</style>
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+            onClick={() => !isLoading && setShowDeleteModal(false)}
+          >
+            <div 
+              className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden animate-modal-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header with warning gradient */}
+              <div className="bg-gradient-to-br from-red-50 to-orange-50 border-b border-red-100 p-4 sm:p-6">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="rounded-full bg-red-100 p-3">
+                    <AlertTriangle className="h-6 w-6 sm:h-8 sm:w-8 text-red-600" />
+                  </div>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-graphite text-center">Delete Patient</h2>
+              </div>
+
+              {/* Content */}
+              <div className="p-4 sm:p-6">
+                <p className="text-drift-gray text-center mb-2 text-sm sm:text-base leading-relaxed">
+                  Are you sure you want to delete <span className="font-semibold text-graphite">{selectedPatient?.name}</span>?
+                </p>
+                <p className="text-xs sm:text-sm text-drift-gray/80 text-center mb-6">
+                  This action cannot be undone. All patient data, appointments, and records will be permanently deleted.
+                </p>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                  <button
+                    onClick={() => setShowDeleteModal(false)}
+                    disabled={isLoading}
+                    className="px-5 py-2.5 rounded-lg border border-earth-beige bg-white text-graphite text-sm font-medium transition-all duration-200 hover:bg-pale-stone hover:border-soft-amber disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeletePatient}
+                    disabled={isLoading}
+                    className="px-5 py-2.5 rounded-lg bg-red-500 text-white text-sm font-medium transition-all duration-200 hover:bg-red-600 active:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Deleting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4" />
+                        <span>Delete Patient</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Deactivate Confirmation Modal */}
@@ -787,16 +861,11 @@ export default function PatientsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-in fade-in duration-300">
           <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full animate-in zoom-in-95 duration-300">
             <h3 className="text-lg font-semibold text-graphite mb-2">
-              {selectedPatient?.status === "active" ? "Deactivate" : "Activate"} Patient
+              Deactivate Patient
             </h3>
             <p className="text-drift-gray mb-4">
-              Are you sure you want to {selectedPatient?.status === "active" ? "deactivate" : "activate"}{" "}
-              {selectedPatient?.name}?
-              {selectedPatient?.status === "active" && (
-                <span className="block mt-2 text-sm text-amber-600">
-                  This will prevent the patient from logging into their account.
-                </span>
-              )}
+              Are you sure you want to deactivate {selectedPatient?.name}? This will prevent the patient from logging
+              into their account.
             </p>
             <div className="flex justify-end space-x-3">
               <button
@@ -807,14 +876,10 @@ export default function PatientsPage() {
               </button>
               <button
                 onClick={handleDeactivatePatient}
-                className={`px-4 py-2 text-white rounded-md transition-colors ${
-                  selectedPatient?.status === "active"
-                    ? "bg-amber-500 hover:bg-amber-600"
-                    : "bg-green-500 hover:bg-green-600"
-                }`}
+                className="px-4 py-2 text-white rounded-md transition-colors bg-amber-500 hover:bg-amber-600"
                 disabled={isLoading}
               >
-                {isLoading ? "Processing..." : selectedPatient?.status === "active" ? "Deactivate" : "Activate"}
+                {isLoading ? "Processing..." : "Deactivate"}
               </button>
             </div>
           </div>

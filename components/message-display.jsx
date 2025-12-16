@@ -315,7 +315,30 @@ const MessageDisplay = ({
             }`}
           >
             <p className="font-medium">{formatReplyHeader(message.replyTo)}</p>
-            <p className="truncate">{message.replyTo.content}</p>
+            {/* Show image if replying to an image message */}
+            {((message.replyTo.type === "image" || message.replyTo.fileData?.type?.startsWith("image/")) && 
+              (message.replyTo.fileData || message.replyTo.fileUrl)) && (
+              <div className="mt-1 mb-1 overflow-hidden rounded-md max-w-[120px]">
+                <img
+                  src={
+                    message.replyTo.fileData?.base64 
+                      ? createDataURL(message.replyTo.fileData.base64, message.replyTo.fileData.type || "image/jpeg")
+                      : message.replyTo.fileUrl || "/placeholder.svg"
+                  }
+                  alt="Reply image"
+                  className="w-full h-auto object-cover max-h-[60px]"
+                  loading="lazy"
+                />
+              </div>
+            )}
+            {/* Show text content if available */}
+            {message.replyTo.content && (
+              <p className="truncate">{message.replyTo.content}</p>
+            )}
+            {/* Show file name if it's a file but no content */}
+            {!message.replyTo.content && message.replyTo.fileName && (
+              <p className="truncate text-gray-500">{message.replyTo.fileName}</p>
+            )}
           </div>
         )}
 

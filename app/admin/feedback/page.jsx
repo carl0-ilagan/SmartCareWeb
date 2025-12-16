@@ -692,11 +692,12 @@ export default function AdminFeedbackPage() {
                     </div>
 
                     <div className="flex items-center gap-3 rounded-lg bg-white p-3">
-                      <div className="h-10 w-10 overflow-hidden rounded-full bg-earth-beige">
+                      <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full">
                         <ProfileImage
                           src={selected.userProfile}
                           alt={selected.userName || "User"}
-                          className="h-full w-full"
+                          className="!h-10 !w-10 !rounded-full"
+                          imgClassName="h-full w-full object-cover"
                           role={selected.userRole}
                         />
                       </div>

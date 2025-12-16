@@ -450,6 +450,11 @@ export default function MessagesPage() {
             content: replyingTo.content,
             sender: replyingTo.sender,
             senderName: replyingTo.sender === user.uid ? user.displayName : doctorDetails?.displayName,
+            type: replyingTo.type || "text",
+            // Include file data for images/files/videos/audio
+            fileData: replyingTo.fileData || null,
+            fileUrl: replyingTo.fileUrl || null,
+            fileName: replyingTo.fileName || null,
           }
         : null
 
@@ -616,6 +621,11 @@ export default function MessagesPage() {
       content: message.content,
       sender: message.sender,
       isSender: message.sender === user?.uid,
+      type: message.type || "text",
+      // Include file data for images/files/videos/audio
+      fileData: message.fileData || null,
+      fileUrl: message.fileUrl || null,
+      fileName: message.fileName || null,
     })
     inputRef.current?.focus()
   }
@@ -644,30 +654,42 @@ export default function MessagesPage() {
     }
   }
 
-  // Format last active time
-  const formatLastActive = (timestamp) => {
+  // Format last active time - more accurate calculation
+  const formatLastActive = (timestamp, isOnline = false) => {
     if (!timestamp) return "Offline"
 
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
     const now = new Date()
-    const diffMinutes = Math.floor((now - date) / (1000 * 60))
+    const diffMs = now.getTime() - date.getTime()
+    const diffSeconds = Math.floor(diffMs / 1000)
+    const diffMinutes = Math.floor(diffSeconds / 60)
+    const diffHours = Math.floor(diffMinutes / 60)
+    const diffDays = Math.floor(diffHours / 24)
 
+    // If user is marked as online or was active within last 2 minutes, show "Active now"
+    if (isOnline || diffSeconds < 120) {
+      return "Active now"
+    }
+
+    // Less than 1 minute ago
     if (diffMinutes < 1) {
       return "Just now"
-    } else if (diffMinutes < 60) {
-      return `${diffMinutes} ${diffMinutes === 1 ? "minute" : "minutes"} ago`
-    } else {
-      const diffHours = Math.floor(diffMinutes / 60)
-      if (diffHours < 24) {
-        return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`
-      } else {
-        const diffDays = Math.floor(diffHours / 24)
-        if (diffDays < 7) {
-          return `${diffDays} ${diffDays === 1 ? "day" : "days"} ago`
-        } else {
-          return date.toLocaleDateString()
-        }
-      }
+    }
+    // Less than 1 hour ago - show minutes
+    else if (diffMinutes < 60) {
+      return `Active ${diffMinutes} ${diffMinutes === 1 ? "minute" : "minutes"} ago`
+    }
+    // Less than 24 hours ago - show hours
+    else if (diffHours < 24) {
+      return `Active ${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`
+    }
+    // Less than 7 days ago - show days
+    else if (diffDays < 7) {
+      return `Active ${diffDays} ${diffDays === 1 ? "day" : "days"} ago`
+    }
+    // More than 7 days - show date
+    else {
+      return `Active on ${date.toLocaleDateString()}`
     }
   }
 
@@ -883,13 +905,13 @@ export default function MessagesPage() {
               <div>
                 <h2 className="font-medium text-graphite">{doctorDetails.displayName}</h2>
                 <p className="text-xs text-drift-gray flex items-center">
-                  {doctorOnlineStatus.isOnline ? (
+                  {formatLastActive(doctorOnlineStatus.lastActive, doctorOnlineStatus.isOnline) === "Active now" ? (
                     <>
                       <span className="mr-1 h-2 w-2 rounded-full bg-green-500 inline-block"></span>
-                      Online
+                      Active now
                     </>
                   ) : (
-                    <>Last active: {formatLastActive(doctorOnlineStatus.lastActive)}</>
+                    <>{formatLastActive(doctorOnlineStatus.lastActive, doctorOnlineStatus.isOnline)}</>
                   )}
                 </p>
               </div>

@@ -18,6 +18,7 @@ import {
   Edit,
 } from "lucide-react"
 import { format, formatDistanceToNow } from "date-fns"
+import { useToast } from "@/components/ui/use-toast"
 import {
   collection,
   query,
@@ -738,6 +739,11 @@ export default function NotificationsPage() {
                               const callRef = doc(db, "calls", callId)
                               const snap = await getDoc(callRef)
                               if (!snap.exists()) {
+                                toast({
+                                  title: "Room Already Ended",
+                                  description: "The room is already ended by the doctor.",
+                                  variant: "destructive",
+                                })
                                 window.location.assign("/dashboard/appointments")
                                 return
                               }
@@ -747,6 +753,11 @@ export default function NotificationsPage() {
                               if (isActive && notRevoked) {
                                 window.location.assign(notification.actionLink)
                               } else {
+                                toast({
+                                  title: "Room Already Ended",
+                                  description: "The room is already ended by the doctor.",
+                                  variant: "destructive",
+                                })
                                 window.location.assign("/dashboard/appointments")
                               }
                             } catch {

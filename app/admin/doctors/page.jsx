@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
-import { Search, Filter, Eye, Trash2, UserX, Users, UserCheck, UserMinus, UserPlus, ChevronDown } from "lucide-react"
+import { Search, Filter, Eye, Trash2, Users, UserCheck, UserMinus, UserPlus, ChevronDown, AlertTriangle, Loader2 } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { collection, query, getDocs, where, doc, deleteDoc, updateDoc } from "firebase/firestore"
 import { AdminHeaderBanner } from "@/components/admin-header-banner"
@@ -41,7 +41,6 @@ export default function DoctorsPage() {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
   const [specialtyDropdownOpen, setSpecialtyDropdownOpen] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [showDeactivateModal, setShowDeactivateModal] = useState(false)
   const [selectedDoctor, setSelectedDoctor] = useState(null)
   const [specialties, setSpecialties] = useState([])
   const [stats, setStats] = useState({
@@ -55,7 +54,6 @@ export default function DoctorsPage() {
   const router = useRouter()
 
   const [isDeleting, setIsDeleting] = useState(false)
-  const [isUpdating, setIsUpdating] = useState(false)
   const [deleteSuccess, setDeleteSuccess] = useState(false)
   const [updateSuccess, setUpdateSuccess] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
@@ -351,92 +349,6 @@ export default function DoctorsPage() {
     }
   }
 
-  // Handle doctor deactivation
-  const handleDeactivateDoctor = async () => {
-    if (selectedDoctor) {
-      try {
-        setIsUpdating(true)
-        const newStatus = selectedDoctor.status === "active" ? "inactive" : "active"
-
-        // Try to update in doctors collection first
-        try {
-          await updateDoc(doc(db, "doctors", selectedDoctor.id), {
-            status: newStatus,
-          })
-          console.log("Doctor status updated in doctors collection")
-        } catch (error) {
-          console.log("Doctor not found in doctors collection or error:", error)
-
-          // Try to update in users collection
-          try {
-            await updateDoc(doc(db, "users", selectedDoctor.id), {
-              status: newStatus,
-            })
-            console.log("Doctor status updated in users collection")
-          } catch (userError) {
-            console.error("Failed to update doctor status in users collection:", userError)
-            throw new Error("Failed to update doctor status in any collection")
-          }
-        }
-
-        // Update local state
-        const updatedDoctors = doctors.map((doctor) => {
-          if (doctor.id === selectedDoctor.id) {
-            return { ...doctor, status: newStatus }
-          }
-          return doctor
-        })
-
-        setDoctors(updatedDoctors)
-        setFilteredDoctors(
-          updatedDoctors.filter((doctor) => {
-            let match = true
-            if (statusFilter !== "all") {
-              match = match && doctor.status === statusFilter
-            }
-            if (specialtyFilter !== "all") {
-              match = match && doctor.specialty === specialtyFilter
-            }
-            return match
-          }),
-        )
-
-        // Update stats
-        if (newStatus === "active") {
-          setStats({
-            ...stats,
-            active: stats.active + 1,
-            inactive: stats.inactive - 1,
-          })
-        } else {
-          setStats({
-            ...stats,
-            active: stats.active - 1,
-            inactive: stats.inactive + 1,
-          })
-        }
-
-        setShowDeactivateModal(false)
-        setSelectedDoctor(null)
-        setUpdateSuccess(true)
-
-        // Hide success message after 3 seconds
-        setTimeout(() => {
-          setUpdateSuccess(false)
-        }, 3000)
-      } catch (error) {
-        console.error("Error updating doctor status:", error)
-        setUpdateError(error.message)
-
-        // Hide error message after 3 seconds
-        setTimeout(() => {
-          setUpdateError(null)
-        }, 3000)
-      } finally {
-        setIsUpdating(false)
-      }
-    }
-  }
 
   // Loading state
   if (isLoading) {
@@ -711,17 +623,6 @@ export default function DoctorsPage() {
                         onClick={(e) => {
                           e.stopPropagation()
                           setSelectedDoctor(doctor)
-                          setShowDeactivateModal(true)
-                        }}
-                        className="p-2 text-blue-500 hover:bg-blue-50 rounded-full"
-                        aria-label="Toggle status"
-                      >
-                        <UserX className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedDoctor(doctor)
                           setShowDeleteModal(true)
                         }}
                         className="p-2 text-red-500 hover:bg-red-50 rounded-full"
@@ -839,7 +740,7 @@ export default function DoctorsPage() {
                             e.stopPropagation()
                             router.push(`/admin/doctors/${doctor.id}`)
                           }}
-                          className="p-1 rounded-full hover:bg-pale-stone text-drift-gray"
+                          className="p-1.5 rounded-full hover:bg-soft-amber/10 text-soft-amber transition-colors"
                           aria-label="View doctor details"
                         >
                           <Eye className="h-5 w-5" />
@@ -848,20 +749,9 @@ export default function DoctorsPage() {
                           onClick={(e) => {
                             e.stopPropagation()
                             setSelectedDoctor(doctor)
-                            setShowDeactivateModal(true)
-                          }}
-                          className="p-1 rounded-full hover:bg-pale-stone text-drift-gray"
-                          aria-label={doctor.status === "active" ? "Deactivate doctor" : "Activate doctor"}
-                        >
-                          <UserX className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedDoctor(doctor)
                             setShowDeleteModal(true)
                           }}
-                          className="p-1 rounded-full hover:bg-pale-stone text-drift-gray"
+                          className="p-1.5 rounded-full hover:bg-red-50 text-red-600 transition-colors"
                           aria-label="Delete doctor"
                         >
                           <Trash2 className="h-5 w-5" />
@@ -912,82 +802,117 @@ export default function DoctorsPage() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-graphite mb-2">Delete Doctor</h3>
-            <p className="text-drift-gray mb-4">
-              Are you sure you want to delete {selectedDoctor?.name}? This action cannot be undone.
-            </p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 border border-earth-beige rounded-md text-drift-gray hover:bg-pale-stone"
-                disabled={isDeleting}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteDoctor}
-                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center"
-                disabled={isDeleting}
-              >
-                {isDeleting ? (
-                  <>
-                    <span className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></span>
-                    Deleting...
-                  </>
-                ) : (
-                  "Delete"
-                )}
-              </button>
+        <>
+          <style jsx>{`
+            @keyframes fadeIn {
+              from {
+                opacity: 0;
+              }
+              to {
+                opacity: 1;
+              }
+            }
+            @keyframes fadeOut {
+              from {
+                opacity: 1;
+              }
+              to {
+                opacity: 0;
+              }
+            }
+            @keyframes modalIn {
+              from {
+                opacity: 0;
+                transform: scale(0.95) translateY(-10px);
+              }
+              to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+              }
+            }
+            @keyframes modalOut {
+              from {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+              }
+              to {
+                opacity: 0;
+                transform: scale(0.95) translateY(10px);
+              }
+            }
+            .animate-fade-in {
+              animation: fadeIn 0.3s ease-out;
+            }
+            .animate-fade-out {
+              animation: fadeOut 0.3s ease-out;
+            }
+            .animate-modal-in {
+              animation: modalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            }
+            .animate-modal-out {
+              animation: modalOut 0.3s ease-in;
+            }
+          `}</style>
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+            onClick={() => !isDeleting && setShowDeleteModal(false)}
+          >
+            <div 
+              className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden animate-modal-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header with warning gradient */}
+              <div className="bg-gradient-to-br from-red-50 to-orange-50 border-b border-red-100 p-4 sm:p-6">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="rounded-full bg-red-100 p-3">
+                    <AlertTriangle className="h-6 w-6 sm:h-8 sm:w-8 text-red-600" />
+                  </div>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-graphite text-center">Delete Doctor</h2>
+              </div>
+
+              {/* Content */}
+              <div className="p-4 sm:p-6">
+                <p className="text-drift-gray text-center mb-2 text-sm sm:text-base leading-relaxed">
+                  Are you sure you want to delete <span className="font-semibold text-graphite">{selectedDoctor?.name}</span>?
+                </p>
+                <p className="text-xs sm:text-sm text-drift-gray/80 text-center mb-6">
+                  This action cannot be undone. All doctor data, appointments, and records will be permanently deleted.
+                </p>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                  <button
+                    onClick={() => setShowDeleteModal(false)}
+                    disabled={isDeleting}
+                    className="px-5 py-2.5 rounded-lg border border-earth-beige bg-white text-graphite text-sm font-medium transition-all duration-200 hover:bg-pale-stone hover:border-soft-amber disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeleteDoctor}
+                    disabled={isDeleting}
+                    className="px-5 py-2.5 rounded-lg bg-red-500 text-white text-sm font-medium transition-all duration-200 hover:bg-red-600 active:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Deleting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4" />
+                        <span>Delete Doctor</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
-      {/* Deactivate Confirmation Modal */}
-      {showDeactivateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-graphite mb-2">
-              {selectedDoctor?.status === "active" ? "Deactivate" : "Activate"} Doctor
-            </h3>
-            <p className="text-drift-gray mb-4">
-              Are you sure you want to {selectedDoctor?.status === "active" ? "deactivate" : "activate"}{" "}
-              {selectedDoctor?.name}?
-            </p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowDeactivateModal(false)}
-                className="px-4 py-2 border border-earth-beige rounded-md text-drift-gray hover:bg-pale-stone"
-                disabled={isUpdating}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeactivateDoctor}
-                className={`px-4 py-2 text-white rounded-md flex items-center ${
-                  selectedDoctor?.status === "active"
-                    ? "bg-orange-500 hover:bg-orange-600"
-                    : "bg-green-500 hover:bg-green-600"
-                }`}
-                disabled={isUpdating}
-              >
-                {isUpdating ? (
-                  <>
-                    <span className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></span>
-                    Updating...
-                  </>
-                ) : selectedDoctor?.status === "active" ? (
-                  "Deactivate"
-                ) : (
-                  "Activate"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Success and Error Notifications */}
       {deleteSuccess && (

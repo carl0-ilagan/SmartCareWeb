@@ -310,6 +310,16 @@
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
       }
 
+      // --- SETTINGS COLLECTION ---
+      match /settings/{docId} {
+        // Allow public read access to maintenance settings (needed for maintenance mode check)
+        // This allows both client-side and server-side API routes to read maintenance status
+        allow read: if docId == "maintenance";
+        
+        // Only admins can write settings
+        allow write: if isAdmin();
+      }
+
       // --- SYSTEM COLLECTION (for welcome content, landing page, etc.) ---
       match /system/{docId} {
         // Allow read access to all users (even unauthenticated)

@@ -55,15 +55,37 @@ export default function RoomPage({ params }) {
   const hasShownEndedToastRef = useRef(false)
 
   const getRedirectPath = (callData) => {
-    const role = userRole || callData?.callerRole || callData?.receiverRole || callData?.role
-    // Explicitly redirect to correct dashboards
-    if (role === "doctor") return "/doctor/dashboard"
-    if (role === "admin") return "/admin/dashboard"
-    // Fallback: if current path is under /doctor, keep doctor dashboard
-    if (typeof window !== "undefined" && window.location.pathname.startsWith("/doctor")) {
+    // Priority 1: Use userRole from auth context (most reliable)
+    if (userRole === "doctor") {
       return "/doctor/dashboard"
     }
-    // Default to patient dashboard
+    if (userRole === "admin") {
+      return "/admin/dashboard"
+    }
+    if (userRole === "patient") {
+      return "/dashboard"
+    }
+    
+    // Priority 2: Check callData roles
+    const role = callData?.callerRole || callData?.receiverRole || callData?.role
+    if (role === "doctor") {
+      return "/doctor/dashboard"
+    }
+    if (role === "admin") {
+      return "/admin/dashboard"
+    }
+    
+    // Priority 3: Fallback - check current pathname to determine role
+    if (typeof window !== "undefined") {
+      if (window.location.pathname.startsWith("/doctor")) {
+        return "/doctor/dashboard"
+      }
+      if (window.location.pathname.startsWith("/admin")) {
+        return "/admin/dashboard"
+      }
+    }
+    
+    // Default: patient dashboard
     return "/dashboard"
   }
 
@@ -207,15 +229,15 @@ export default function RoomPage({ params }) {
           console.log("❌ Room does not exist, redirecting to dashboard...")
           if (!hasShownEndedToastRef.current) {
             toast({
-              title: "The room already ended",
-              description: "This room is no longer available.",
+              title: "Room Already Ended",
+              description: "The room is already ended by the doctor.",
               variant: "destructive",
             })
             hasShownEndedToastRef.current = true
           }
           if (typeof window !== "undefined") {
             setTimeout(() => {
-              const redirectPath = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
+              const redirectPath = getRedirectPath({})
               window.location.assign(redirectPath)
             }, 150)
           }
@@ -229,15 +251,15 @@ export default function RoomPage({ params }) {
           console.log("❌ Room is ended/inactive, cannot join. Redirecting to dashboard...")
           if (!hasShownEndedToastRef.current) {
             toast({
-              title: "The room already ended",
-              description: "This room is no longer available.",
+              title: "Room Already Ended",
+              description: "The room is already ended by the doctor.",
               variant: "destructive",
             })
             hasShownEndedToastRef.current = true
           }
           if (typeof window !== "undefined") {
             setTimeout(() => {
-              const redirectPath = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
+              const redirectPath = getRedirectPath(callData)
               window.location.assign(redirectPath)
             }, 150)
           }
@@ -268,15 +290,15 @@ export default function RoomPage({ params }) {
             console.log("❌ Cannot join: Room is ended. Redirecting to dashboard...")
             if (!hasShownEndedToastRef.current) {
               toast({
-                title: "The room already ended",
-                description: "This room is no longer available.",
+                title: "Room Already Ended",
+                description: "The room is already ended by the doctor.",
                 variant: "destructive",
               })
               hasShownEndedToastRef.current = true
             }
             if (typeof window !== "undefined") {
               setTimeout(() => {
-                const redirectPath = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
+                const redirectPath = getRedirectPath(callData)
                 window.location.assign(redirectPath)
               }, 150)
             }
@@ -378,9 +400,9 @@ export default function RoomPage({ params }) {
             console.log("❌ Room was deleted, redirecting to dashboard...")
             if (!hasShownEndedToastRef.current) {
               toast({
-                title: "The room already ended",
-                description: "The call has been closed.",
-                variant: "destructive",
+                title: "Online Consult Done",
+                description: "The online consultation has been completed successfully.",
+                variant: "default",
               })
               hasShownEndedToastRef.current = true
             }
@@ -388,7 +410,7 @@ export default function RoomPage({ params }) {
             try { if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t)=>t.stop()) } catch {}
             if (typeof window !== "undefined") {
               setTimeout(() => {
-                const redirectPath = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
+                const redirectPath = getRedirectPath(d || {})
                 window.location.assign(redirectPath)
               }, 150)
             }
@@ -400,9 +422,9 @@ export default function RoomPage({ params }) {
             console.log("❌ Room was ended, redirecting to dashboard...")
             if (!hasShownEndedToastRef.current) {
               toast({
-                title: "The room already ended",
-                description: "The call has been closed.",
-                variant: "destructive",
+                title: "Online Consult Done",
+                description: "The online consultation has been completed successfully.",
+                variant: "default",
               })
               hasShownEndedToastRef.current = true
             }
@@ -410,7 +432,7 @@ export default function RoomPage({ params }) {
             try { if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t)=>t.stop()) } catch {}
             if (typeof window !== "undefined") {
               setTimeout(() => {
-                const redirectPath = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
+                const redirectPath = getRedirectPath(d)
                 window.location.assign(redirectPath)
               }, 150)
             }
@@ -686,6 +708,10 @@ export default function RoomPage({ params }) {
     setIsRevoking(true)
     try {
       const callRef = doc(db, "calls", callId)
+      // Get call data to determine correct redirect path
+      const callSnap = await getDoc(callRef)
+      const callData = callSnap.exists() ? callSnap.data() : {}
+      
       await updateDoc(callRef, {
         status: "ended",
         endedAt: serverTimestamp(),
@@ -695,26 +721,29 @@ export default function RoomPage({ params }) {
       setTimeout(async () => {
         try { await deleteDoc(callRef) } catch {}
       }, 500)
+      
+      // Determine correct redirect path using getRedirectPath function
+      const redirectPath = getRedirectPath(callData)
+      
+      if (typeof window !== "undefined") {
+        // Notify once and redirect both doctor and patient to their respective dashboards when call is ended
+        if (!hasShownEndedToastRef.current) {
+          toast({
+            title: "Online Consult Done",
+            description: "The online consultation has been completed successfully.",
+            variant: "default",
+          })
+          hasShownEndedToastRef.current = true
+        }
+        setTimeout(() => {
+          window.location.assign(redirectPath)
+        }, 150)
+      }
     } catch (e) {
       // no-op
     } finally {
       try { if (pcRef.current) pcRef.current.close() } catch {}
       try { if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t) => t.stop()) } catch {}
-      if (typeof window !== "undefined") {
-        // Notify once and redirect both doctor and patient to their respective dashboards when call is ended
-        if (!hasShownEndedToastRef.current) {
-          toast({
-            title: "The room already ended",
-            description: "The call has been closed.",
-            variant: "destructive",
-          })
-          hasShownEndedToastRef.current = true
-        }
-        setTimeout(() => {
-          const redirectPath = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
-          window.location.assign(redirectPath)
-        }, 150)
-      }
     }
   }
 

@@ -41,6 +41,7 @@ export function NotificationDropdown() {
   const [loading, setLoading] = useState(true)
   const [userSettings, setUserSettings] = useState(null)
   const { user } = useAuth()
+  const { toast } = useToast()
   const isDoctor = typeof window !== "undefined" && window.location.pathname.includes("/doctor")
 
   // Fetch user settings
@@ -312,8 +313,6 @@ export function NotificationDropdown() {
       </div>
     )
   }
-
-  const { toast } = useToast()
 
   const handleCallInviteClick = async (notification, e) => {
     try {

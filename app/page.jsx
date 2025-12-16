@@ -114,8 +114,9 @@ function ContactForm({ contactEmail = "smartcarefamily@gmail.com", brandName = "
         },
         body: JSON.stringify({
           to: contactEmail,
-          from: `${formData.name} <${formData.email}>`, // User's email as "from" address
-          replyTo: formData.email, // Set reply-to so admin can reply directly
+          // Don't set 'from' - use default server email to prevent email injection
+          // User email is included in the message body instead
+          replyTo: formData.email, // Set reply-to so admin can reply directly (validated server-side)
           subject: `${brandName} Contact Form: ${formData.subject}`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -123,13 +124,13 @@ function ContactForm({ contactEmail = "smartcarefamily@gmail.com", brandName = "
                 New Contact Form Submission - ${brandName}
               </h2>
               <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <p><strong>Name:</strong> ${formData.name}</p>
-                <p><strong>Email:</strong> <a href="mailto:${formData.email}" style="color: #d97706; text-decoration: none;">${formData.email}</a></p>
-                <p><strong>Subject:</strong> ${formData.subject}</p>
+                <p><strong>Name:</strong> ${formData.name.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+                <p><strong>Email:</strong> <a href="mailto:${formData.email.replace(/</g, '&lt;').replace(/>/g, '&gt;')}" style="color: #d97706; text-decoration: none;">${formData.email.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</a></p>
+                <p><strong>Subject:</strong> ${formData.subject.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
               </div>
               <div style="background: #fff; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
                 <h3 style="color: #374151; margin-top: 0;">Message:</h3>
-                <p style="color: #6b7280; line-height: 1.6; white-space: pre-wrap;">${formData.message}</p>
+                <p style="color: #6b7280; line-height: 1.6; white-space: pre-wrap;">${formData.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
               </div>
               <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">
                 This message was sent from the ${brandName} contact form. You can reply directly to this email to respond to ${formData.name}.

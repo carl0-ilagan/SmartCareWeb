@@ -13,7 +13,6 @@ import {
   Calendar,
   AlertCircle,
   SlidersHorizontal,
-  Download,
   X,
   ChevronLeft,
   ChevronRight,
@@ -541,20 +540,6 @@ export default function DoctorPrescriptionsPage() {
                 >
                   Preview
                 </button>
-                  {status === "active" && (
-                  <button
-                      onClick={() => handlePrintPrescription(prescription)}
-                      disabled={prescription.downloadedByPatient === true}
-                      className={`flex-1 inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
-                        prescription.downloadedByPatient === true
-                          ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                          : "bg-gradient-to-r from-soft-amber to-amber-500 text-white hover:from-amber-500 hover:to-amber-600"
-                      }`}
-                    >
-                      <Download className="mr-1 h-3.5 w-3.5" />
-                      {prescription.downloadedByPatient === true ? "Downloaded" : "PDF"}
-                    </button>
-                  )}
                   {status !== "active" && (
                     <button
                       onClick={() => handleConfirmDelete(prescription)}
@@ -656,20 +641,6 @@ export default function DoctorPrescriptionsPage() {
                 >
                   Delete
                 </button>
-                {prescription.status === "active" && (
-                  <button
-                    onClick={() => handlePrintPrescription(prescription)}
-                        disabled={prescription.downloadedByPatient === true}
-                        className={`inline-flex items-center rounded-lg px-3 py-1.5 text-[11px] font-medium transition-colors ${
-                          prescription.downloadedByPatient === true
-                            ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                            : "bg-soft-amber text-white hover:bg-amber-600"
-                        }`}
-                  >
-                    <Download className="mr-1 h-3.5 w-3.5" />
-                        {prescription.downloadedByPatient === true ? "Downloaded" : "PDF"}
-                  </button>
-                )}
                   </div>
                 </div>
               </div>

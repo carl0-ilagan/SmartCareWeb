@@ -13,7 +13,6 @@ import {
   Calendar,
   AlertCircle,
   CheckCircle,
-  Download,
 } from "lucide-react"
 import { PrescriptionTemplate } from "@/components/prescription-template"
 import { AppointmentCheckModal } from "@/components/appointment-check-modal"
@@ -26,8 +25,10 @@ import {
   generatePrintablePrescription,
   savePrescription,
   getDoctorPatients,
-  generatePrescriptionPDF,
 } from "@/lib/prescription-utils"
+import { sendNotification } from "@/lib/notification-utils"
+import { getUserDetails } from "@/lib/user-utils"
+import { sendEmailNotification } from "@/lib/email-service"
 import { useAuth } from "@/contexts/auth-context"
 
 export default function NewPrescriptionPage() {
@@ -358,8 +359,57 @@ export default function NewPrescriptionPage() {
         throw new Error(result.message || "Failed to save prescription")
       }
 
+      const prescriptionId = result.prescriptionId
 
-      // Show success notification
+      // Fire patient-facing notifications (in-app + email + push via listener)
+      try {
+        // Get patient details for email and avatar
+        const patientDetails = await getUserDetails(formData.patientId)
+
+        // In-app notification (this will also drive push notifications via NotificationListener)
+        await sendNotification(formData.patientId, {
+          title: "New Prescription Available",
+          message: `Dr. ${doctorInfo.name} has created a new prescription for you.`,
+          type: "prescription",
+          actionLink: "/dashboard/prescriptions",
+          actionText: "View Prescription",
+          imageUrl: doctorInfo.photoURL || null,
+          metadata: {
+            prescriptionId,
+            doctorId: user.uid,
+            doctorName: doctorInfo.name,
+            patientId: formData.patientId,
+            patientName: formData.patientName,
+          },
+        }).catch((err) => {
+          console.error("Error sending in-app prescription notification to patient:", err)
+        })
+
+        // Email notification (uses user settings inside email-service)
+        if (patientDetails?.email) {
+          const emailSubject = "New Prescription from Your Doctor"
+          const primaryMed =
+            Array.isArray(formData.medications) && formData.medications[0]?.name
+              ? ` for ${formData.medications[0].name}`
+              : ""
+          const emailMessage =
+            `Dear ${formData.patientName || "Patient"},\n\n` +
+            `Dr. ${doctorInfo.name} has created a new prescription${primaryMed} for you in Smart Care.\n\n` +
+            `You can view the full details and download your prescription by logging in to your Smart Care account.\n\n` +
+            `Best regards,\nSmart Care Team`
+
+          sendEmailNotification(patientDetails.email, emailSubject, emailMessage, formData.patientId).catch((err) => {
+            if (err?.message && !err.message.includes("ETIMEDOUT") && !err.message.includes("timeout")) {
+              console.error("Error sending prescription email notification to patient:", err)
+            }
+          })
+        }
+      } catch (notifError) {
+        console.error("Error sending prescription notifications to patient:", notifError)
+        // Do not fail the prescription creation if notifications fail
+      }
+
+      // Show success notification (doctor-side UI)
       setNotification({
         message: "Prescription created successfully",
         isVisible: true,
@@ -464,48 +514,6 @@ export default function NewPrescriptionPage() {
     }
   }
 
-  // Handle PDF download
-  const handleDownloadPDF = () => {
-    try {
-      if (!formData.patientName || !doctorInfo) {
-        setNotification({
-          message: "Missing patient or doctor information",
-          isVisible: true,
-        })
-        return
-      }
-
-      // Generate PDF
-      const doc = generatePrescriptionPDF(
-        {
-          medications: formData.medications,
-          signature: formData.signature,
-        },
-        doctorInfo,
-        {
-          name: formData.patientName,
-          age: formData.patientAge,
-          gender: formData.patientGender,
-        },
-      )
-
-      // Save the PDF
-      doc.save(
-        `prescription_${formData.patientName.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`,
-      )
-
-      setNotification({
-        message: "PDF downloaded successfully",
-        isVisible: true,
-      })
-    } catch (error) {
-      console.error("Error generating PDF:", error)
-      setNotification({
-        message: "Error generating PDF",
-        isVisible: true,
-      })
-    }
-  }
 
   // Handle template save
   const handleSaveTemplate = (template) => {
@@ -924,15 +932,6 @@ export default function NewPrescriptionPage() {
               >
                 Cancel
               </Link>
-              <button
-                type="button"
-                onClick={handleDownloadPDF}
-                disabled={!isFormValid() || !appointmentVerified || !formData.signature}
-                className="inline-flex items-center rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite shadow-sm transition-colors hover:bg-pale-stone focus:outline-none focus:ring-2 focus:ring-earth-beige focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Download PDF
-              </button>
               <button
                 type="submit"
                 disabled={!isFormValid() || loading || !appointmentVerified || !formData.signature}
